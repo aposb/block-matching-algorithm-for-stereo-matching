@@ -17,7 +17,8 @@ Mat leftImage, rightImage, disparityMap, disparityImage;
 Table3 initialCost, aggregatedCost;
 int width, height, windowSize, levels;
 
-int computeMatchingCost(int x, int y, int label);
+int computeInitialCost(int x, int y, int label);
+int computeAggregatedCost(int x, int y, int label);
 int findBestAssignment(int x, int y);
 
 int main()
@@ -45,16 +46,14 @@ int main()
 	for (int y = 0; y < height; y++)
 		for (int x = 0; x < width; x++)
 			for (int i = 0; i < levels; i++)
-				initialCost[y][x][i] = computeMatchingCost(x, y, i);
+				initialCost[y][x][i] = computeInitialCost(x, y, i);
 
-	// Compute aggregated matching cost
-	aggregatedCost = Table3(height, Table2(width, Table1(levels, 0)));
+	// Cache aggregated matching cost
+	aggregatedCost = Table3(height, Table2(width, Table1(levels)));
 	for (int y = 0; y < height; y++)
 		for (int x = 0; x < width; x++)
 			for (int i = 0; i < levels; i++)
-				for (int dy = -windowSize / 2; dy < windowSize / 2 + windowSize % 2; dy++)
-					for (int dx = -windowSize / 2; dx < windowSize / 2 + windowSize % 2; dx++)
-						aggregatedCost[y][x][i] += (y + dy >= 0 && y + dy < height && x + dx >= 0 && x + dx < width) ? initialCost[y+dy][x+dx][i] : 0;
+				aggregatedCost[y][x][i] = computeAggregatedCost(x, y, i);
 
 	// Initialize disparity map
 	disparityMap = Mat::zeros(height, width, CV_8U);
@@ -89,11 +88,21 @@ int main()
 	return 0;
 }
 
-int computeMatchingCost(int x, int y, int label)
+int computeInitialCost(int x, int y, int label)
 {
 	int leftPixel = leftImage.at<uchar>(y, x);
 	int rightPixel = (x >= label) ? rightImage.at<uchar>(y, x - label) : 0;
 	int cost = abs(leftPixel - rightPixel);
+
+	return cost;
+}
+
+int computeAggregatedCost(int x, int y, int label)
+{
+	int cost = 0;
+	for (int dy = -windowSize / 2; dy < windowSize / 2 + windowSize % 2; dy++)
+		for (int dx = -windowSize / 2; dx < windowSize / 2 + windowSize % 2; dx++)
+			cost += (y + dy >= 0 && y + dy < height&& x + dx >= 0 && x + dx < width) ? initialCost[y + dy][x + dx][label] : 0;
 
 	return cost;
 }
